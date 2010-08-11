@@ -153,12 +153,11 @@
                                          (filter #(= (count args)
                                                      (count (first %))))
                                          first)
-                    locals (zipmap params args)
-                    stack1 (conj (if fn-name
+                    locals (vec (mapcat list params args))
+                    stack1 (if fn-name
                                    (conj stack {fn-name thisfn})
                                    stack)
-                                 locals)
-                    body (conj body 'do)]
+                    body (conj body locals 'loop*)]
                 (second (meval [stack1 body])))))]))
 
 (defmethod eval-seq 'def [[stack [_ name value]]]

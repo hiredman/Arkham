@@ -38,7 +38,14 @@
         (is (= @(ns-resolve ns s) 1))))
     (testing "fn*"
       (is (= 1 (evil '((let [x 1] (fn [] x)))))
-          "fn* closes over lexical scope")))
+          "fn* closes over lexical scope")
+      (is (= [1 2]
+               (evil '(let [x (fn ([x] x) ([x y] y))]
+                        [(x 1) (x 1 2)]))))
+      (is (= 5 (evil '((fn [x]
+                         (if (= x 5)
+                           x
+                           (recur (inc x)))) 0))))))
   (testing "get-var"
     (is (= evil (evil 'eval))))
   (testing "ctor and dot"
