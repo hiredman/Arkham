@@ -35,7 +35,8 @@
 (defmethod eval-seq :default [[state [op & args]]]
   (let [op (second (meval [state op]))
         args (doall (map (fn [x] (second (meval [state x]))) args))]
-    [state (apply op args)]))
+    (fn []
+      [state (apply op args)])))
 
 (defmethod eval-seq 'let* [[stack [_ bindings & body]]]
   [stack
@@ -59,10 +60,11 @@
              (meval [stack e]))
            body))))])
 
-(defmethod eval-seq 'quote [[stack [_ name]]]
-  [stack name])
+(defmethod eval-seq 'quote [[stack [_ name]]] [stack name])
 
 (defmethod eval-seq 'var [[stack [_ sym]]]
+  ;; this seems off, may still be possible to get a var that you
+  ;; aren't supposed to have access to.
   [stack (if-let [v (ns-resolve *ns* sym)]
            (get-var v sym)
            (clojure.lang.Var/intern
@@ -74,8 +76,6 @@
    (if (second (meval [stack a]))
      (second (meval [stack b]))
      (second (meval [stack c])))])
-
-
 
 (defmethod eval-seq '. [[stack [_ target name- & args]]]
   (let [target (second (meval [stack target]))]
