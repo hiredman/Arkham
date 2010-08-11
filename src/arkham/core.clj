@@ -114,20 +114,38 @@
       (meval
        [(rest stack1) (conj bodies bindings 'loop*)]))))
 
-(defmethod eval-seq 'fn* [[stack [_ & bodies]]]
-  [stack
-   (let [max-args (if-let [m (->> bodies
-                                  (map first)
-                                  (map #(.contains % '&))
-                                  (some true?))]
-                    m
-                    (apply max (map count (map first bodies))))]
-     max-args)]
-  #_(fn [& args]
-      (second
-       (meval
-        [(conj stack (into {} (map vector bindings args)))
-         (cons 'do body)]))))
+(defmethod eval-seq 'fn* [[stack [_ & args]]]
+  (let [fn-name (when (symbol? (first args))
+                  (first args))
+        args (if fn-name
+               (rest args)
+               args)
+        bodies (if (vector? (first args))
+                 (list args)
+                 args)
+        max-args (if-let [m (->> bodies
+                                 (map first)
+                                 (map #(.contains % '&))
+                                 (some true?))]
+                   :&
+                   (apply max (map count (map first bodies))))]
+    [stack (fn thisfn [& args]
+             (when (and (number? max-args)
+                        (> (count args) max-args))
+               (throw (Exception.
+                       (format "to many arguments to %s (%s)"
+                               (or fn-name thisfn)
+                               max-args))))
+             (cond
+              (and (not= max-args :&)
+                   (= 1 (count bodies)))
+              (let [[params & body] (first bodies)
+                    locals (zipmap params args)
+                    stack1 (conj stack locals)
+                    body (conj body 'do)]
+                [stack (second (meval [stack1 body]))])
+              (not= max-args :&)
+              :foo))]))
 
 (defmethod eval-seq 'def [[stack [_ name value]]]
   (let [evalue (second (meval [stack value]))]
