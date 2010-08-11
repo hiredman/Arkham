@@ -37,7 +37,8 @@
           (evil (list 'def s 1)))
         (is (= @(ns-resolve ns s) 1))))
     (testing "fn*"
-      (is (= 1 (evil '((let [x 1] (fn [] x))))))))
+      (is (= 1 (evil '((let [x 1] (fn [] x)))))
+          "fn* closes over lexical scope")))
   (testing "get-var"
     (is (= evil (evil 'eval))))
   (testing "ctor and dot"

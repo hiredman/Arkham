@@ -128,7 +128,12 @@
                                  (map #(.contains % '&))
                                  (some true?))]
                    :&
-                   (apply max (map count (map first bodies))))]
+                   (apply max (map count (map first bodies))))
+        max-non-varg (->> bodies
+                          (remove #(.contains (first %) '&))
+                          (map first)
+                          (map count)
+                          (apply max))]
     [stack (fn thisfn [& args]
              (when (and (number? max-args)
                         (> (count args) max-args))
@@ -137,15 +142,18 @@
                                (or fn-name thisfn)
                                max-args))))
              (cond
-              (and (not= max-args :&)
-                   (= 1 (count bodies)))
-              (let [[params & body] (first bodies)
+              (>= max-non-varg (count args))
+              (let [[params & body] (->> bodies
+                                         (filter #(= (count args)
+                                                     (count (first %))))
+                                         first)
                     locals (zipmap params args)
-                    stack1 (conj stack locals)
+                    stack1 (conj (if fn-name
+                                   (conj stack {fn-name thisfn})
+                                   stack)
+                                 locals)
                     body (conj body 'do)]
-                (second (meval [stack1 body])))
-              (not= max-args :&)
-              :foo))]))
+                (second (meval [stack1 body])))))]))
 
 (defmethod eval-seq 'def [[stack [_ name value]]]
   (let [evalue (second (meval [stack value]))]
