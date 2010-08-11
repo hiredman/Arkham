@@ -136,9 +136,6 @@
      (clojure.lang.Var/intern *ns* name evalue true)
      (constantly (meta name)))))
 
-#_(defmethod eval-seq 'loop [[stack [_ bindings & body]]]
-    )
-
 (defn evil [exp]
   (second (meval [() (mexpand-all exp)])))
 
