@@ -1,7 +1,12 @@
 (ns arkham.core
   (:use [clojure.contrib.macro-utils :only [mexpand-all]]))
 
+(declare dot ctor get-var)
+
 (defrecord SpecialFrame [tag args])
+
+(defn special-frame? [frame]
+  (= SpecialFrame (type frame)))
 
 (defmethod print-method SpecialFrame [o w]
   (.write w (str "#" (name (:tag o)))))
@@ -11,14 +16,12 @@
 (defmethod meval :default [[stack exp]]
   [stack exp])
 
-(declare get-var)
-
 (defmethod meval clojure.lang.Symbol [[stack exp]]
   [stack
    (if (= exp '*STACK*)
      stack
      (if-let [bound  (->> stack
-                          (remove #(= SpecialFrame (type %)))
+                          (remove special-frame?)
                           (filter #(contains? % exp))
                           first)]
        (get bound exp)
@@ -72,7 +75,7 @@
      (second (meval [stack b]))
      (second (meval [stack c])))])
 
-(declare dot)
+
 
 (defmethod eval-seq '. [[stack [_ target name- & args]]]
   (let [target (second (meval [stack target]))]
@@ -80,8 +83,6 @@
      (if (class? target)
        (throw (Exception. "huh?"))
        (dot target name- args stack))]))
-
-(declare ctor)
 
 (defmethod eval-seq 'new [[stack [_ class & args]]]
   (let [class (second (meval [stack (list 'var class)]))]
@@ -100,7 +101,7 @@
 (defmethod eval-seq 'recur [[stack [_ & args]]]
   (fn []
     (let [stack1 (loop [[s & ss] stack]
-                   (if (not (and (= SpecialFrame (type s))
+                   (if (not (and (special-frame? s)
                                  (= :loop (:tag s))))
                      (recur ss)
                      (conj ss s)))
