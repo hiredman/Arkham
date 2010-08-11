@@ -76,22 +76,20 @@
      (second (meval [stack b]))
      (second (meval [stack c])))])
 
+(declare dot)
+
 (defmethod eval-seq '. [[stack [_ target name- & args]]]
-  [stack
-   (if (class? target)
-     (throw (Exception. "huh?"))
-     (clojure.lang.Reflector/invokeInstanceMethod
-      (second (meval [stack target]))
-      (name name-)
-      (into-array Object
-                  (map #(second (meval [stack %])) args))))])
+  (let [target (second (meval [stack target]))]
+    [stack
+     (if (class? target)
+       (throw (Exception. "huh?"))
+       (dot target name- args stack))]))
+
+(declare ctor)
 
 (defmethod eval-seq 'new [[stack [_ class & args]]]
-  [stack
-   (clojure.lang.Reflector/invokeConstructor
-    (second (meval [stack (list 'var class)]))
-    (into-array Object
-                (map #(second (meval [stack %])) args)))])
+  (let [class (second (meval [stack (list 'var class)]))]
+    [stack (ctor class stack args)]))
 
 (defmethod eval-seq 'throw [[stack [_ exception]]]
   (throw (second (meval [stack exception]))))
@@ -106,10 +104,10 @@
 (defmethod eval-seq 'recur [[stack [_ & args]]]
   (fn []
     (let [stack1 (loop [[s & ss] stack]
-                  (if (not (and (= SpecialFrame (type s))
-                                (= :loop (:tag s))))
-                    (recur ss)
-                    (conj ss s)))
+                   (if (not (and (= SpecialFrame (type s))
+                                 (= :loop (:tag s))))
+                     (recur ss)
+                     (conj ss s)))
           {tag :tag [bindings bodies] :args} (first stack1)
           args (->> args
                     (map #(meval [stack %]))
@@ -145,3 +143,28 @@
 
 (defn evil* [exp]
   (meval [() (mexpand-all exp)]))
+
+(defmulti ctor (comp first list))
+
+(defmethod ctor :default [class stack args]
+  (clojure.lang.Reflector/invokeConstructor
+   class
+   (into-array Object
+               (map #(second (meval [stack %])) args))))
+
+(defmethod ctor Thread [& _]
+  (throw (Exception. "DENIED")))
+
+
+(defmulti dot (fn [target method args stack]
+                [(class target) method]))
+
+(defmethod dot :default [target method args stack]
+  (clojure.lang.Reflector/invokeInstanceMethod
+   target
+   (name method)
+   (into-array Object
+               (map #(second (meval [stack %])) args))))
+
+(defmethod dot [clojure.lang.Var 'invoke] [& _]
+  (throw (Exception. "DENIED")))
