@@ -40,6 +40,10 @@
                           (recur (inc x) (conj s (count *STACK*)))))))
           "loop/recur uses a constant stack space"))
     (testing "def"
-      (let [s (gensym)]
-        (evil (list 'def s 1))
-        (is (= @(ns-resolve *ns* s) 1))))))
+      (let [s (gensym)
+            ns (create-ns s)]
+        (binding [*ns* ns]
+          (evil (list 'def s 1)))
+        (is (= @(ns-resolve ns s) 1))))
+    (testing "fn*"
+      (is (= 1 (evil '((let [x 1] (fn [] x)))))))))
