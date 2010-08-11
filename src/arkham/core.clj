@@ -1,9 +1,6 @@
 (ns arkham.core
   (:use [clojure.contrib.macro-utils :only [mexpand-all]]))
 
-(def replacement-vars
-  {#'clojure.core/eval #'arkham.core/evil})
-
 (defrecord SpecialFrame [tag args])
 
 (defmethod print-method SpecialFrame [o w]
@@ -14,6 +11,8 @@
 (defmethod meval :default [[stack exp]]
   [stack exp])
 
+(declare get-var)
+
 (defmethod meval clojure.lang.Symbol [[stack exp]]
   [stack
    (if (= exp '*STACK*)
@@ -23,12 +22,7 @@
                           (filter #(contains? % exp))
                           first)]
        (get bound exp)
-       (if-let [v (ns-resolve *ns* exp)]
-         @(replacement-vars v v)
-         (throw
-          (Exception.
-           (format
-            "Unable to resolve symbol: %s in this context" (name exp)))))))])
+       @(get-var (ns-resolve *ns* exp) exp)))])
 
 (defmulti eval-seq (fn [[stack [first & _]]] first))
 
@@ -65,10 +59,12 @@
 (defmethod eval-seq 'quote [[stack [_ name]]]
   [stack name])
 
-(defmethod eval-seq 'var [[stack [_ & body]]]
-  [stack (replacement-vars
-          (ns-resolve *ns* (first body))
-          (ns-resolve *ns* (first body)))])
+(defmethod eval-seq 'var [[stack [_ sym]]]
+  [stack (if-let [v (ns-resolve *ns* sym)]
+           (get-var v sym)
+           (clojure.lang.Var/intern
+            (or (namespace sym) *ns*)
+            (symbol (name sym))))])
 
 (defmethod eval-seq 'if [[stack [_ a b c]]]
   [stack
@@ -168,3 +164,14 @@
 
 (defmethod dot [clojure.lang.Var 'invoke] [& _]
   (throw (Exception. "DENIED")))
+
+(defmulti get-var (comp first list))
+
+(defmethod get-var :default [var sym] var)
+
+(defmethod get-var nil [_ sym]
+  (throw
+   (Exception.
+    (format "Unable to resolve symbol: %s in this context" (name sym)))))
+
+(defmethod get-var #'clojure.core/eval [_ _]  #'arkham.core/evil)
