@@ -32,6 +32,12 @@
 (defmethod meval clojure.lang.ISeq [[state exp]]
   (trampoline eval-seq [state exp]))
 
+(defmethod meval clojure.lang.IPersistentVector [[stack exp]]
+  [stack
+   (->> exp
+        (map #(second (meval [stack %])))
+        vec)])
+
 (defmethod eval-seq :default [[state [op & args]]]
   (let [op (second (meval [state op]))
         args (doall (map (fn [x] (second (meval [state x]))) args))]
