@@ -3,7 +3,7 @@
         [clojure.test]))
 
 (deftest test-evil
-    (testing "symbol resolution"
+  (testing "symbol resolution"
     (is (thrown? Exception (evil 'f))))
   (testing "function calling"
     (is (= 3
@@ -30,14 +30,6 @@
     (testing "throw"
       (is (thrown? IllegalArgumentException
                    (evil '(throw (IllegalArgumentException. "foo"))))))
-    (testing "loop/recur"
-      (is (= :end (evil '(loop [x 1] (if (= x 2) :end (recur (inc x)))))))
-      (is (= [2 2 2 2]
-               (evil '(loop [x 0 s []]
-                        (if (= x 4)
-                          s
-                          (recur (inc x) (conj s (count *STACK*)))))))
-          "loop/recur uses a constant stack space"))
     (testing "def"
       (let [s (gensym)
             ns (create-ns s)]
@@ -45,9 +37,20 @@
           (evil (list 'def s 1)))
         (is (= @(ns-resolve ns s) 1))))
     #_(testing "fn*"
-      (is (= 1 (evil '((let [x 1] (fn [] x))))))))
+        (is (= 1 (evil '((let [x 1] (fn [] x))))))))
   (testing "get-var"
     (is (= evil (evil 'eval))))
   (testing "ctor and dot"
     (is (thrown? Exception (evil '(Thread.))))
     (is (thrown? Exception (evil '(.invoke (var +) 1 2))))))
+
+(deftest test-loop-recur
+  (testing "loop/recur"
+    (is (= :end (evil '(loop [x 1] (if (= x 2) :end (recur (inc x)))))))
+    (is (= [2 2 2 2]
+             (evil '(loop [x 0 s []]
+                      (if (= x 4)
+                        s
+                        (recur (inc x) (conj s (count *STACK*)))))))
+        "loop/recur uses a constant stack space")
+    (is (= 1 (evil '(loop [[x & xs] [3 2 1]] (if (= 1 x) x (recur xs))))))))
