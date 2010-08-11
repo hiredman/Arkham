@@ -1,6 +1,5 @@
 (ns arkham.core
-  (:use [clojure.contrib.macro-utils :only [mexpand-all]]
-        [clojure.contrib.java-utils :only [wall-hack-method]]))
+  (:use [clojure.contrib.macro-utils :only [mexpand-all]]))
 
 (defrecord SpecialFrame [tag args])
 
