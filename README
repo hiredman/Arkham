@@ -1,10 +1,14 @@
 # Arkham
 
-FIXME: write description
+As an interpreter Arkham's goal is to provide fine grained control over the
+evaluation of the language.
+
+Arkham is written so that the language it interprets follows Clojure's semantics
+as far as posible.
 
 ## Usage
 
-FIXME: write
+where you would use eval use evil
 
 ## Installation
 
@@ -12,6 +16,6 @@ FIXME: write
 
 ## License
 
-Copyright (C) 2010 FIXME
+Copyright (C) 2010 Kevin Downey
 
 Distributed under the Eclipse Public License, the same as Clojure.
