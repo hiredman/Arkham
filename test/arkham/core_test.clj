@@ -15,8 +15,7 @@
     ;; DONE:
     ;; . if let* do quote var new throw loop/recur def
     (testing "do"
-      (is (= 1
-             (evil '(do 2 1))))
+      (is (= 1 (evil '(do 2 1))))
       (is (= 2 (evil '(do 1 (+ 1 1))))))
     (testing "quote"
       (is (= 'a (evil '(quote a)))))
@@ -45,5 +44,10 @@
         (binding [*ns* ns]
           (evil (list 'def s 1)))
         (is (= @(ns-resolve ns s) 1))))
-    (testing "fn*"
-      (is (= 1 (evil '((let [x 1] (fn [] x)))))))))
+    #_(testing "fn*"
+      (is (= 1 (evil '((let [x 1] (fn [] x))))))))
+  (testing "get-var"
+    (is (= evil (evil 'eval))))
+  (testing "ctor and dot"
+    (is (thrown? Exception (evil '(Thread.))))
+    (is (thrown? Exception (evil '(.invoke (var +) 1 2))))))
