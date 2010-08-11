@@ -143,7 +143,7 @@
                     locals (zipmap params args)
                     stack1 (conj stack locals)
                     body (conj body 'do)]
-                [stack (second (meval [stack1 body]))])
+                (second (meval [stack1 body])))
               (not= max-args :&)
               :foo))]))
 

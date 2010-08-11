@@ -36,8 +36,8 @@
         (binding [*ns* ns]
           (evil (list 'def s 1)))
         (is (= @(ns-resolve ns s) 1))))
-    #_(testing "fn*"
-        (is (= 1 (evil '((let [x 1] (fn [] x))))))))
+    (testing "fn*"
+      (is (= 1 (evil '((let [x 1] (fn [] x))))))))
   (testing "get-var"
     (is (= evil (evil 'eval))))
   (testing "ctor and dot"
