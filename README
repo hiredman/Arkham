@@ -1,6 +1,6 @@
 # Arkham
 
-As an interpreter Arkham's goal is to provide fine grained control over the evaluation of alanguage.
+As an interpreter Arkham's goal is to provide fine grained control over the evaluation of a language.
 
 Arkham is written so that the language it interprets follows Clojure's semantics as far as posible.
 
