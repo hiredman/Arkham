@@ -5,7 +5,7 @@
 (defrecord SpecialFrame [tag args])
 
 (defmethod print-method SpecialFrame [o w]
-  (.write w "#=<recur>"))
+  (.write w "#=<>"))
 
 (defmulti meval (comp type second))
 
