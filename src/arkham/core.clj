@@ -1,10 +1,13 @@
 (ns arkham.core
   (:use [clojure.contrib.macro-utils :only [mexpand-all]]))
 
+(def replacement-vars
+  {#'clojure.core/eval #'arkham.core/evil})
+
 (defrecord SpecialFrame [tag args])
 
 (defmethod print-method SpecialFrame [o w]
-  (.write w "#=<>"))
+  (.write w (str "#" (name (:tag o)))))
 
 (defmulti meval (comp type second))
 
@@ -21,7 +24,7 @@
                           first)]
        (get bound exp)
        (if-let [v (ns-resolve *ns* exp)]
-         @v
+         @(replacement-vars v v)
          (throw
           (Exception.
            (format
@@ -63,7 +66,9 @@
   [stack name])
 
 (defmethod eval-seq 'var [[stack [_ & body]]]
-  [stack (ns-resolve *ns* (first body))])
+  [stack (replacement-vars
+          (ns-resolve *ns* (first body))
+          (ns-resolve *ns* (first body)))])
 
 (defmethod eval-seq 'if [[stack [_ a b c]]]
   [stack
