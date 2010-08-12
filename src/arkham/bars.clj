@@ -22,3 +22,12 @@
 
 (defmethod ctor clojure.lang.Agent [& _]
   (throw (Exception. "DENIED")))
+
+(defmethod get-var #'clojure.core/alter-var-root [_ _]
+  (throw (Exception. "DENIED")))
+
+(defmethod dot [clojure.lang.Var 'alter] [& _]
+  (throw (Exception. "DENIED")))
+
+(defmethod dot [clojure.lang.Var 'alterRoot] [& _]
+  (throw (Exception. "DENIED")))
