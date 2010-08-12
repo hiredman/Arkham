@@ -133,12 +133,19 @@
                                  (map first)
                                  (map #(.contains % '&))
                                  (some true?))]
-                   :&
+                   (->> bodies
+                        (map first)
+                        (filter #(.contains % '&))
+                        first
+                        (take-while #(not= '& %))
+                        count
+                        vector)
                    (apply max (map count (map first bodies))))
         max-non-varg (->> bodies
                           (remove #(.contains (first %) '&))
                           (map first)
                           (map count)
+                          (cons 0)
                           (apply max))]
     [stack (fn thisfn [& args]
              (when (and (number? max-args)
@@ -153,12 +160,36 @@
                                          (filter #(= (count args)
                                                      (count (first %))))
                                          first)
-                    locals (vec (mapcat list params args))
                     stack1 (if fn-name
-                                   (conj stack {fn-name thisfn})
-                                   stack)
-                    body (conj body locals 'loop*)]
-                (second (meval [stack1 body])))))]))
+                             (conj stack {fn-name thisfn})
+                             stack)
+                    stack1 (conj stack1
+                                 (SpecialFrame. :loop [params body])
+                                 (zipmap params args))
+                    body (conj body 'do)]
+                (second (meval [stack1 body])))
+              (vector max-args)
+              (let [[params & body] (->> bodies
+                                         (filter #(.contains (first %) '&))
+                                         first)
+                    normal-params (take-while #(not= '& %) params)
+                    varg-param (first (drop (inc (count normal-params)) params))
+                    normal-args (take (count normal-params) args)
+                    vargs (drop (count normal-args) args)
+                    stack1 (if fn-name
+                             (conj stack {fn-name thisfn})
+                             stack)
+                    stack1 (conj stack1
+                                 (SpecialFrame. :loop [(concat normal-params
+                                                               [varg-param])
+                                                       body])
+                                 (assoc (zipmap normal-params normal-args)
+                                   varg-param vargs))
+                    body (conj body 'do)]
+                (println stack1 body)
+                (second (meval [stack1 body])))
+              :else
+              (throw (Exception. "... the hell?"))))]))
 
 (defmethod eval-seq 'def [[stack [_ name value]]]
   (let [evalue (second (meval [stack value]))]

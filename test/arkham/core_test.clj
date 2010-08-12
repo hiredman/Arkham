@@ -45,7 +45,11 @@
       (is (= 5 (evil '((fn [x]
                          (if (= x 5)
                            x
-                           (recur (inc x)))) 0))))))
+                           (recur (inc x)))) 0))))
+      (is (= [1 2 3 4]
+               (evil
+                '((fn [a b c & xs] (vector a b c (first xs))) 1 2 3 4))))
+      (is (= '+ (evil '((fn [x] x) '+))))))
   (testing "get-var"
     (is (= evil (evil 'eval))))
   (testing "ctor and dot"
