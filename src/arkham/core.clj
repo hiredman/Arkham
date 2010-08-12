@@ -168,7 +168,7 @@
                                  (zipmap params args))
                     body (conj body 'do)]
                 (second (meval [stack1 body])))
-              (vector max-args)
+              (vector? max-args)
               (let [[params & body] (->> bodies
                                          (filter #(.contains (first %) '&))
                                          first)
