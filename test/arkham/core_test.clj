@@ -8,12 +8,14 @@
   (testing "function calling"
     (is (= 3
            (evil '(+ 1 2)))))
+  (testing "binding"
+    (is (= 3 (evil '(binding [* +] (* 1 2))))))
   (testing "special forms"
     ;; TODO:
-    ;; letfn* fn* set! try
+    ;; letfn* set! try
     ;; catch finally deftype* case* reify*
     ;; DONE:
-    ;; . if let* do quote var new throw loop/recur def
+    ;; . if let* do quote var new throw loop/recur def fn*
     (testing "do"
       (is (= 1 (evil '(do 2 1))))
       (is (= 2 (evil '(do 1 (+ 1 1))))))
@@ -40,7 +42,22 @@
     (is (= evil (evil 'eval))))
   (testing "ctor and dot"
     (is (thrown? Exception (evil '(Thread.))))
-    (is (thrown? Exception (evil '(.invoke (var +) 1 2))))))
+    (is (thrown? Exception (evil '(.invoke (var +) 1 2)))))
+  (testing "try/catch/finally"
+    (is (= 1 (evil '(try 1 (catch Exception _)))))
+    (is (= 2 (evil '(try (throw (Exception. "foo")) (catch Exception _ 2)))))
+    (is (thrown? Exception (evil'(try
+                                   (throw (Exception. "foo"))
+                                   (catch ArithmeticException _
+                                     2)))))
+    (is (= [1 2] (evil '(let [x (java.util.HashMap.)]
+                          (try
+                            (throw (Exception. "foo"))
+                            (catch Exception _
+                              (.put x :a 1))
+                            (finally
+                             (.put x :b 2)))
+                          [(.get x :a) (.get x :b)]))))))
 
 (deftest test-loop-recur
   (testing "loop/recur"
@@ -55,16 +72,16 @@
 
 (deftest test-fn*
   (testing "fn*"
-      (is (= 1 (evil '((let [x 1] (fn [] x)))))
-          "fn* closes over lexical scope")
-      (is (= [1 2]
-               (evil '(let [x (fn ([x] x) ([x y] y))]
-                        [(x 1) (x 1 2)]))))
-      (is (= 5 (evil '((fn [x]
-                         (if (= x 5)
-                           x
-                           (recur (inc x)))) 0))))
-      (is (= [1 2 3 4]
-               (evil
-                '((fn [a b c & xs] (vector a b c (first xs))) 1 2 3 4))))
-      (is (= '+ (evil '((fn [x] x) '+))) "no double eviling")))
+    (is (= 1 (evil '((let [x 1] (fn [] x)))))
+        "fn* closes over lexical scope")
+    (is (= [1 2]
+             (evil '(let [x (fn ([x] x) ([x y] y))]
+                      [(x 1) (x 1 2)]))))
+    (is (= 5 (evil '((fn [x]
+                       (if (= x 5)
+                         x
+                         (recur (inc x)))) 0))))
+    (is (= [1 2 3 4]
+             (evil
+              '((fn [a b c & xs] (vector a b c (first xs))) 1 2 3 4))))
+    (is (= '+ (evil '((fn [x] x) '+))) "no double eviling")))

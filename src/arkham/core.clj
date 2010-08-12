@@ -186,10 +186,32 @@
                                  (assoc (zipmap normal-params normal-args)
                                    varg-param vargs))
                     body (conj body 'do)]
-                (println stack1 body)
                 (second (meval [stack1 body])))
               :else
               (throw (Exception. "... the hell?"))))]))
+
+(defmethod eval-seq 'try [[stack [_ & forms]]]
+  (let [body (take-while #(or (not (seq? %))
+                              (and (not= (first %) 'catch)
+                                   (not= (first %) 'finally)))
+                         forms)
+        catch (->> forms (drop (count body))
+                   (filter #(= 'catch (first %))))
+        finally (first (drop (+ (count catch) (count body)) forms))]
+    (try
+      (meval [stack (conj body 'do)])
+      (catch Throwable t
+        (let [body (->> catch
+                        (filter #(isa? (type t) (ns-resolve *ns* (second %))))
+                        first)]
+          (if-not (seq body)
+            (throw t)
+            (let [[_ class name & body] body
+                  body (conj body 'do)
+                  stack1 (conj stack {name t})]
+              [stack (second (meval [stack1 body]))]))))
+      (finally
+       (meval [stack (conj (rest finally) 'do)])))))
 
 (defmethod eval-seq 'def [[stack [_ name value]]]
   (let [evalue (second (meval [stack value]))]
@@ -205,32 +227,39 @@
 
 (defmulti ctor (comp first list))
 
-(defmethod ctor :default [class stack args]
+(defn ctor-default [class stack args]
   (clojure.lang.Reflector/invokeConstructor
    class
    (into-array Object
                (map #(second (meval [stack %])) args))))
 
+(defmethod ctor :default [class stack args]
+  (ctor-default class stack args))
+
 (defmethod ctor Thread [& _]
   (throw (Exception. "DENIED")))
-
 
 (defmulti dot (fn [target method args stack]
                 [(class target) method]))
 
-(defmethod dot :default [target method args stack]
+(defn dot-default [target method args stack]
   (clojure.lang.Reflector/invokeInstanceMethod
    target
    (name method)
    (into-array Object
                (map #(second (meval [stack %])) args))))
 
+(defmethod dot :default [target method args stack]
+  (dot-default target method args stack))
+
 (defmethod dot [clojure.lang.Var 'invoke] [& _]
   (throw (Exception. "DENIED")))
 
 (defmulti get-var (comp first list))
 
-(defmethod get-var :default [var sym] var)
+(defn get-var-default [var sym] var)
+
+(defmethod get-var :default [var sym] (get-var-default var sym))
 
 (defmethod get-var nil [_ sym]
   (throw
