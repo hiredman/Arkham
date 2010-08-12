@@ -8,6 +8,31 @@ Arkham is written so that the language it interprets follows Clojure's semantics
 
 where you would use eval use evil
 
+if you want to change the constructor behaviour for a certain class:
+
+(defmethod ctor Thread [& _]
+  (throw (Exception. "DENIED")))
+
+;;=> (evil '(Thread.))
+;; #<Exception java.lang.Exception: DENIED>
+
+change the behaviour of method invocation:
+
+(defmethod dot [clojure.lang.Var 'invoke] [& _]
+  (throw (Exception. "DENIED")))
+
+;;=> (evil '(.invoke #'+ 1 2))
+;; #<Exception java.lang.Exception: DENIED>
+
+change var resolution:
+
+(defmethod get-var #'clojure.core/eval [_ _]  #'arkham.core/evil)
+
+;;=> (evil '#'clojure.core/eval)
+;; #'arkham.core/evil
+;;=> (evil 'clojure.core/eval)
+;; #<core$evil arkham.core$evil@43748549>
+
 ## Installation
 
 FIXME: write
