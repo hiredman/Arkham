@@ -236,9 +236,6 @@
 (defmethod ctor :default [class stack args]
   (ctor-default class stack args))
 
-(defmethod ctor Thread [& _]
-  (throw (Exception. "DENIED")))
-
 (defmulti dot (fn [target method args stack]
                 [(class target) method]))
 
@@ -252,18 +249,8 @@
 (defmethod dot :default [target method args stack]
   (dot-default target method args stack))
 
-(defmethod dot [clojure.lang.Var 'invoke] [& _]
-  (throw (Exception. "DENIED")))
-
 (defmulti get-var (comp first list))
 
 (defn get-var-default [var sym] var)
 
 (defmethod get-var :default [var sym] (get-var-default var sym))
-
-(defmethod get-var nil [_ sym]
-  (throw
-   (Exception.
-    (format "Unable to resolve symbol: %s in this context" (name sym)))))
-
-(defmethod get-var #'clojure.core/eval [_ _]  #'arkham.core/evil)

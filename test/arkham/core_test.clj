@@ -1,13 +1,13 @@
 (ns arkham.core-test
   (:use [arkham.core]
-        [clojure.test]))
+        [clojure.test])
+  (:require [arkham.bars]))
 
 (deftest test-evil
   (testing "symbol resolution"
     (is (thrown? Exception (evil 'f))))
   (testing "function calling"
-    (is (= 3
-           (evil '(+ 1 2)))))
+    (is (= 3 (evil '(+ 1 2)))))
   (testing "binding"
     (is (= 3 (evil '(binding [* +] (* 1 2))))))
   (testing "special forms"
