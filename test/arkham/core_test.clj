@@ -42,22 +42,7 @@
     (is (= evil (evil 'eval))))
   (testing "ctor and dot"
     (is (thrown? Exception (evil '(Thread.))))
-    (is (thrown? Exception (evil '(.invoke (var +) 1 2)))))
-  (testing "try/catch/finally"
-    (is (= 1 (evil '(try 1 (catch Exception _)))))
-    (is (= 2 (evil '(try (throw (Exception. "foo")) (catch Exception _ 2)))))
-    (is (thrown? Exception (evil'(try
-                                   (throw (Exception. "foo"))
-                                   (catch ArithmeticException _
-                                     2)))))
-    (is (= [1 2] (evil '(let [x (java.util.HashMap.)]
-                          (try
-                            (throw (Exception. "foo"))
-                            (catch Exception _
-                              (.put x :a 1))
-                            (finally
-                             (.put x :b 2)))
-                          [(.get x :a) (.get x :b)]))))))
+    (is (thrown? Exception (evil '(.invoke (var +) 1 2))))))
 
 (deftest test-loop-recur
   (testing "loop/recur"
@@ -85,3 +70,20 @@
              (evil
               '((fn [a b c & xs] (vector a b c (first xs))) 1 2 3 4))))
     (is (= '+ (evil '((fn [x] x) '+))) "no double eviling")))
+
+(deftest test-try-catch-finally
+  (testing "try/catch/finally"
+    (is (= 1 (evil '(try 1 (catch Exception _)))))
+    (is (= 2 (evil '(try (throw (Exception. "foo")) (catch Exception _ 2)))))
+    (is (thrown? Exception (evil'(try
+                                   (throw (Exception. "foo"))
+                                   (catch ArithmeticException _
+                                     2)))))
+    (is (= [1 2] (evil '(let [x (java.util.HashMap.)]
+                          (try
+                            (throw (Exception. "foo"))
+                            (catch Exception _
+                              (.put x :a 1))
+                            (finally
+                             (.put x :b 2)))
+                          [(.get x :a) (.get x :b)]))))))
