@@ -33,6 +33,13 @@ change var resolution:
 ;;=> (evil 'clojure.core/eval)
 ;; #<core$evil arkham.core$evil@43748549>
 
+*STACK* is replaced with the current stack:
+
+;;=> (evil '(let [x 1 y 2] (loop [x (range 10)] *STACK*)))
+;; ({x (0 1 2 3 4 5 6 7 8 9)} #loop {x 1 y 2})
+
+#loop is a special marker on the stack used by recur
+
 ## Installation
 
 FIXME: write
