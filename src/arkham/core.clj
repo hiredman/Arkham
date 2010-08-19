@@ -1,7 +1,7 @@
 (ns arkham.core
   (:use [clojure.contrib.macro-utils :only [mexpand-all]]))
 
-(declare dot ctor get-var)
+(declare dot ctor get-var dot-static)
 
 (defrecord SpecialFrame [tag args])
 
@@ -84,11 +84,11 @@
      (second (meval [stack c])))])
 
 (defmethod eval-seq '. [[stack [_ target name- & args]]]
-  (let [target (second (meval [stack target]))]
+  (let [n (ns-resolve *ns* target)]
     [stack
-     (if (class? target)
-       (throw (Exception. "huh?"))
-       (dot target name- args stack))]))
+     (if (class? n)
+       (dot-static n name- args stack)
+       (dot (second (meval [stack target])) name- args stack))]))
 
 (defmethod eval-seq 'new [[stack [_ class & args]]]
   (let [class (second (meval [stack (list 'var class)]))]
@@ -261,3 +261,16 @@
 (defn get-var-default [var sym] var)
 
 (defmethod get-var :default [var sym] (get-var-default var sym))
+
+(defmulti dot-static (fn [target method args stack]
+                       [target method]))
+
+(defn dot-static-default [target method args stack]
+  (clojure.lang.Reflector/invokeStaticMethod
+   (.getName target)
+   (name method)
+   (into-array Object
+               (map #(second (meval [stack %])) args))))
+
+(defmethod dot-static :default [target method args stack]
+  (dot-static-default target method args stack))
