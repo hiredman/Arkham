@@ -5,7 +5,7 @@
 
 (deftest test-evil
   (testing "symbol resolution"
-    (is (thrown? Exception (evil 'f))))
+    (is (thrown? Exception (evil (gensym)))))
   (testing "function calling"
     (is (= 3 (evil '(+ 1 2)))))
   (testing "binding"
@@ -42,7 +42,8 @@
     (is (= evil (evil 'eval))))
   (testing "ctor and dot"
     (is (thrown? Exception (evil '(Thread.))))
-    (is (thrown? Exception (evil '(.invoke (var +) 1 2))))))
+    (is (thrown? Exception (evil '(.invoke (var +) 1 2))))
+    (is (string? (evil '(System/getenv "USER"))))))
 
 (deftest test-loop-recur
   (testing "loop/recur"
