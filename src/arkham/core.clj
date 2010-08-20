@@ -22,6 +22,9 @@
      stack
      (if-let [bound  (->> stack
                           (remove special-frame?)
+                          (map #(if (instance? clojure.lang.IDeref %)
+                                  @%
+                                  %))
                           (filter #(contains? % exp))
                           first)]
        (get bound exp)
@@ -54,8 +57,7 @@
                             name (second (meval [(conj stack locals) value]))))
                         {}
                         (partition 2 bindings)))]
-      (meval
-       [stack1 (cons 'do body)])))])
+      (meval [stack1 (cons 'do body)])))])
 
 (defmethod eval-seq 'do [[stack [_ & body]]]
   [stack
@@ -226,6 +228,16 @@
      (clojure.lang.Var/intern *ns* name evalue true)
      (constantly (meta name)))))
 
+(defmethod eval-seq 'letfn* [[stack [_ bindings & body]]]
+  (let [stack1 (conj stack (promise))
+        table (zipmap (take-nth 2 bindings)
+                     (map
+                      #(second (meval [stack1 %]))
+                      (take-nth 2 (rest bindings))))]
+    (deliver (first stack1) table)
+    (meval [stack1 (cons 'do body)])))
+
+
 (defn evil [exp]
   (second (meval [() (mexpand-all exp)])))
 
@@ -235,23 +247,17 @@
 (defmulti ctor (comp first list))
 
 (defn ctor-default [class stack args]
-  (clojure.lang.Reflector/invokeConstructor
-   class
-   (into-array Object
-               (map #(second (meval [stack %])) args))))
+  (clojure.lang.Reflector/invokeConstructor class
+   (into-array Object (map #(second (meval [stack %])) args))))
 
-(defmethod ctor :default [class stack args]
-  (ctor-default class stack args))
+(defmethod ctor :default [class stack args] (ctor-default class stack args))
 
-(defmulti dot (fn [target method args stack]
-                [(class target) method]))
+(defmulti dot (fn [target method args stack] [(class target) method]))
 
 (defn dot-default [target method args stack]
   (clojure.lang.Reflector/invokeInstanceMethod
-   target
-   (name method)
-   (into-array Object
-               (map #(second (meval [stack %])) args))))
+   target (name method)
+   (into-array Object (map #(second (meval [stack %])) args))))
 
 (defmethod dot :default [target method args stack]
   (dot-default target method args stack))
@@ -262,15 +268,11 @@
 
 (defmethod get-var :default [var sym] (get-var-default var sym))
 
-(defmulti dot-static (fn [target method args stack]
-                       [target method]))
+(defmulti dot-static (fn [target method args stack] [target method]))
 
 (defn dot-static-default [target method args stack]
-  (clojure.lang.Reflector/invokeStaticMethod
-   (.getName target)
-   (name method)
-   (into-array Object
-               (map #(second (meval [stack %])) args))))
+  (clojure.lang.Reflector/invokeStaticMethod (.getName target) (name method)
+   (into-array Object (map #(second (meval [stack %])) args))))
 
 (defmethod dot-static :default [target method args stack]
   (dot-static-default target method args stack))

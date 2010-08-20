@@ -12,10 +12,11 @@
     (is (= 3 (evil '(binding [* +] (* 1 2))))))
   (testing "special forms"
     ;; TODO:
-    ;; letfn* set!
+    ;; set!
     ;; deftype* case* reify*
     ;; DONE:
-    ;; . if let* do quote var new throw loop/recur def fn* try/catch/finally
+    ;; . if let* do quote var new throw loop/recur def fn*
+    ;; try/catch/finally letfn*
     (testing "do"
       (is (= 1 (evil '(do 2 1))))
       (is (= 2 (evil '(do 1 (+ 1 1))))))
@@ -43,7 +44,9 @@
   (testing "ctor and dot"
     (is (thrown? Exception (evil '(Thread.))))
     (is (thrown? Exception (evil '(.invoke (var +) 1 2))))
-    (is (string? (evil '(System/getenv "USER"))))))
+    (is (string? (evil '(System/getenv "USER")))))
+  (testing "leftfn*"
+    (is (= 1 (evil '(letfn [(foo [x] x) (bar [x] (foo x))] (bar 1)))))))
 
 (deftest test-loop-recur
   (testing "loop/recur"
