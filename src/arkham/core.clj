@@ -232,11 +232,12 @@
   (let [stack1 (conj stack (promise))
         table (zipmap (take-nth 2 bindings)
                      (map
-                      #(second (meval [stack1 %]))
+                      (comp second
+                            meval
+                            (partial vector stack1))
                       (take-nth 2 (rest bindings))))]
     (deliver (first stack1) table)
     (meval [stack1 (cons 'do body)])))
-
 
 (defn evil [exp]
   (second (meval [() (mexpand-all exp)])))
