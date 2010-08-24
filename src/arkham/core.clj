@@ -258,8 +258,8 @@
 (defmulti ctor (comp first list))
 
 (defn ctor-default [class stack args]
-  (Reflector/invokeConstructor class
-                               (into-array Object (map #(second (meval [stack %])) args))))
+  (Reflector/invokeConstructor
+   class (into-array Object (map #(second (meval [stack %])) args))))
 
 (defmethod ctor :default [class stack args] (ctor-default class stack args))
 
@@ -267,7 +267,8 @@
 
 (defn dot-default [target method args stack]
   (Reflector/invokeInstanceMethod
-   target (name method)
+   target
+   (name method)
    (into-array Object (map #(second (meval [stack %])) args))))
 
 (defmethod dot :default [target method args stack]
@@ -282,8 +283,10 @@
 (defmulti dot-static (fn [target method args stack] [target method]))
 
 (defn dot-static-default [target method args stack]
-  (Reflector/invokeStaticMethod (.getName target) (name method)
-                                (into-array Object (map #(second (meval [stack %])) args))))
+  (Reflector/invokeStaticMethod
+   (.getName target)
+   (name method)
+   (into-array Object (map #(second (meval [stack %])) args))))
 
 (defmethod dot-static :default [target method args stack]
   (dot-static-default target method args stack))
