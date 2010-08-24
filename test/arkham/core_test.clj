@@ -87,7 +87,14 @@
     (is (= [1 2 3 4]
              (evil
               '((fn [a b c & xs] (vector a b c (first xs))) 1 2 3 4))))
-    (is (= '+ (evil '((fn [x] x) '+))) "no double eviling")))
+    (is (= '+ (evil '((fn [x] x) '+))) "no double eviling")
+    (is (= [3 3 3 3]
+             (evil '((fn f [x s]
+                       (if (= x 4)
+                         s
+                         (f (inc x) (conj s (count *STACK*)))))
+                     0 [])))
+        "whoops, accidental TCO")))
 
 (deftest test-try-catch-finally
   (testing "try/catch/finally"
@@ -104,11 +111,4 @@
                               (.put x :a 1))
                             (finally
                              (.put x :b 2)))
-                          [(.get x :a) (.get x :b)]))))
-    (is (= [3 3 3 3]
-             (evil '((fn f [x s]
-                       (if (= x 4)
-                         s
-                         (f (inc x) (conj s (count *STACK*)))))
-                     0 [])))
-        "whoops, accidently tail recursive")))
+                          [(.get x :a) (.get x :b)]))))))
