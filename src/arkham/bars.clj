@@ -31,3 +31,5 @@
 
 (defmethod dot [clojure.lang.Var 'alterRoot] [& _]
   (throw (Exception. "DENIED")))
+
+(defmethod static-field [Math 'PI] [& _] (double 3))

@@ -45,7 +45,8 @@
     (is (thrown? Exception (evil '(Thread.))))
     (is (thrown? Exception (evil '(.invoke (var +) 1 2))))
     (is (string? (evil '(System/getenv "USER"))))
-    (is (= java.lang.Math/PI (evil 'Math/PI))))
+    (is (= java.lang.Math/E (evil 'Math/E)))
+    (is (= 3 (evil 'Math/PI))))
   (testing "datastructures"
     (is (= {:a 1} (evil '{(keyword "a") (*)})))
     (is (= [:a 1] (evil '[(keyword "a") (*)])))
