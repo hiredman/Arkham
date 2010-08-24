@@ -1,7 +1,9 @@
 (ns arkham.core
-  (:use [clojure.contrib.macro-utils :only [mexpand-all]]))
+  (:use [clojure.contrib.macro-utils :only [mexpand-all]])
+  (:import [clojure.lang Symbol IDeref ISeq IPersistentVector IPersistentMap
+            IPersistentSet Reflector Var]))
 
-(declare dot ctor get-var dot-static)
+(declare dot ctor get-var dot-static static-field)
 
 (defrecord SpecialFrame [tag args])
 
@@ -16,30 +18,38 @@
 (defmethod meval :default [[stack exp]]
   [stack exp])
 
-(defmethod meval clojure.lang.Symbol [[stack exp]]
+(defmethod meval Symbol [[stack exp]]
   [stack
    (if (= exp '*STACK*)
      stack
      (if-let [bound  (->> stack
                           (remove special-frame?)
-                          (map #(if (instance? clojure.lang.IDeref %)
-                                  @%
-                                  %))
+                          (map #(if (instance? IDeref %) @% %))
                           (filter #(contains? % exp))
                           first)]
        (get bound exp)
-       @(get-var (ns-resolve *ns* exp) exp)))])
+       (if (ns-resolve *ns* exp)
+         @(get-var (ns-resolve *ns* exp) exp)
+         (static-field (ns-resolve *ns* (symbol (namespace exp)))
+                       (symbol (name exp))))))])
 
 (defmulti eval-seq (fn [[stack [first & _]]] first))
 
-(defmethod meval clojure.lang.ISeq [[state exp]]
+(defmethod meval ISeq [[state exp]]
   (trampoline eval-seq [state exp]))
 
-(defmethod meval clojure.lang.IPersistentVector [[stack exp]]
+(defmethod meval IPersistentVector [[stack exp]]
   [stack
    (->> exp
         (map #(second (meval [stack %])))
         vec)])
+
+(defmethod meval IPersistentMap [[stack exp]]
+  [stack
+   (into {} (map (fn [x] (vec (map #(second (meval [stack %])) x))) exp))])
+
+(defmethod meval IPersistentSet [[stack exp]]
+  [stack (set (second (meval [stack (vec exp)])))])
 
 (defmethod eval-seq :default [[state [op & args]]]
   (let [op (second (meval [state op]))
@@ -75,7 +85,7 @@
   ;; aren't supposed to have access to.
   [stack (if-let [v (ns-resolve *ns* sym)]
            (get-var v sym)
-           (clojure.lang.Var/intern
+           (Var/intern
             (or (namespace sym) *ns*)
             (symbol (name sym))))])
 
@@ -225,17 +235,17 @@
 (defmethod eval-seq 'def [[stack [_ name value]]]
   (let [evalue (second (meval [stack value]))]
     (alter-meta!
-     (clojure.lang.Var/intern *ns* name evalue true)
+     (Var/intern *ns* name evalue true)
      (constantly (meta name)))))
 
 (defmethod eval-seq 'letfn* [[stack [_ bindings & body]]]
   (let [stack1 (conj stack (promise))
         table (zipmap (take-nth 2 bindings)
-                     (map
-                      (comp second
-                            meval
-                            (partial vector stack1))
-                      (take-nth 2 (rest bindings))))]
+                      (map
+                       (comp second
+                             meval
+                             (partial vector stack1))
+                       (take-nth 2 (rest bindings))))]
     (deliver (first stack1) table)
     (meval [stack1 (cons 'do body)])))
 
@@ -248,15 +258,15 @@
 (defmulti ctor (comp first list))
 
 (defn ctor-default [class stack args]
-  (clojure.lang.Reflector/invokeConstructor class
-   (into-array Object (map #(second (meval [stack %])) args))))
+  (Reflector/invokeConstructor class
+                               (into-array Object (map #(second (meval [stack %])) args))))
 
 (defmethod ctor :default [class stack args] (ctor-default class stack args))
 
 (defmulti dot (fn [target method args stack] [(class target) method]))
 
 (defn dot-default [target method args stack]
-  (clojure.lang.Reflector/invokeInstanceMethod
+  (Reflector/invokeInstanceMethod
    target (name method)
    (into-array Object (map #(second (meval [stack %])) args))))
 
@@ -272,8 +282,16 @@
 (defmulti dot-static (fn [target method args stack] [target method]))
 
 (defn dot-static-default [target method args stack]
-  (clojure.lang.Reflector/invokeStaticMethod (.getName target) (name method)
-   (into-array Object (map #(second (meval [stack %])) args))))
+  (Reflector/invokeStaticMethod (.getName target) (name method)
+                                (into-array Object (map #(second (meval [stack %])) args))))
 
 (defmethod dot-static :default [target method args stack]
   (dot-static-default target method args stack))
+
+(defmulti static-field (fn [cl fld] [cl fld]))
+
+(defn static-field-default [cl fld]
+  (Reflector/getStaticField (.getName cl) (name fld)))
+
+(defmethod static-field :default [cl fld]
+  (static-field-default cl fld))

@@ -44,9 +44,23 @@
   (testing "ctor and dot"
     (is (thrown? Exception (evil '(Thread.))))
     (is (thrown? Exception (evil '(.invoke (var +) 1 2))))
-    (is (string? (evil '(System/getenv "USER")))))
-  (testing "leftfn*"
-    (is (= 1 (evil '(letfn [(foo [x] x) (bar [x] (foo x))] (bar 1)))))))
+    (is (string? (evil '(System/getenv "USER"))))
+    (is (= java.lang.Math/PI (evil 'Math/PI))))
+  (testing "datastructures"
+    (is (= {:a 1} (evil '{(keyword "a") (*)})))
+    (is (= [:a 1] (evil '[(keyword "a") (*)])))
+    (is (= #{:a 1} (evil '#{(keyword "a") (*)})))))
+
+(deftest test-letfn*
+  (testing "letfn*"
+    (is (= 1 (evil '(letfn [(foo [x] x) (bar [x] (foo x))] (bar 1)))))
+    (is (= 0 (evil '(letfn [(foo [x]
+                                 (if (zero? x)
+                                   x
+                                   (bar (dec x))))
+                            (bar [x]
+                                 (foo x))]
+                      (foo 10)))))))
 
 (deftest test-loop-recur
   (testing "loop/recur"
@@ -90,4 +104,11 @@
                               (.put x :a 1))
                             (finally
                              (.put x :b 2)))
-                          [(.get x :a) (.get x :b)]))))))
+                          [(.get x :a) (.get x :b)]))))
+    (is (= [3 3 3 3]
+             (evil '((fn f [x s]
+                       (if (= x 4)
+                         s
+                         (f (inc x) (conj s (count *STACK*)))))
+                     0 [])))
+        "whoops, accidently tail recursive")))
