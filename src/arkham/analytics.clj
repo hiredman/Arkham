@@ -47,6 +47,8 @@
       (Mock. exp)
       (ns-resolve *ns* exp)
       (do
+        (when (class? (ns-resolve *ns* exp))
+          (swap! *report* update-in [:class] conj exp))
         (swap! *report* update-in [:global] conj exp)
         (Mock. exp))
       (and (namespace exp) (name exp))
@@ -92,12 +94,15 @@
                  (mapcat #(try (ns-imports %) (catch Exception _)) (all-ns))))
         classes (distinct classes)]
     (cons :import
-          (map
-           (fn [[k value]]
-             (vec (cons k (seq value))))
-           (apply merge-with concat
-                  (for [class classes]
-                    (find-class class loaded)))))))
+          (remove
+           #(= 'java.lang
+               (first %))
+           (map
+            (fn [[k value]]
+              (vec (cons k (seq value))))
+            (apply merge-with concat
+                   (for [class classes]
+                     (find-class class loaded))))))))
 
 (defn generate-imports [file]
   (binding [*report* (atom {})
