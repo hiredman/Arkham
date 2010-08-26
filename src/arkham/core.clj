@@ -18,18 +18,22 @@
 (defmethod meval :default [[stack exp]]
   [stack exp])
 
+(defn find-frame [stack exp]
+  (->> stack
+       (remove special-frame?)
+       (map #(if (instance? IDeref %) @% %))
+       (filter #(contains? % exp))
+       first))
+
 (defmethod meval Symbol [[stack exp]]
+  (println "@meval Symbol" exp)
   [stack
    (if (= exp '*STACK*)
      stack
-     (if-let [bound  (->> stack
-                          (remove special-frame?)
-                          (map #(if (instance? IDeref %) @% %))
-                          (filter #(contains? % exp))
-                          first)]
+     (if-let [bound  (find-frame stack exp)]
        (get bound exp)
        (if (ns-resolve *ns* exp)
-         @(get-var (ns-resolve *ns* exp) exp)
+         (deref (get-var (ns-resolve *ns* exp) exp))
          (static-field (ns-resolve *ns* (symbol (namespace exp)))
                        (symbol (name exp))))))])
 
@@ -248,6 +252,9 @@
                        (take-nth 2 (rest bindings))))]
     (deliver (first stack1) table)
     (meval [stack1 (cons 'do body)])))
+
+(defmethod eval-seq 'clojure.core/import* [[stack exp]]
+  [stack (.importClass *ns* (Class/forName (second exp)))])
 
 (defn evil [exp]
   (second (meval [() (mexpand-all exp)])))

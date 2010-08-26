@@ -12,7 +12,7 @@
     (is (= 3 (evil '(binding [* +] (* 1 2))))))
   (testing "special forms"
     ;; TODO:
-    ;; set!
+    ;; set! import*
     ;; deftype* case* reify*
     ;; DONE:
     ;; . if let* do quote var new throw loop/recur def fn*
