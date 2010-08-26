@@ -1,5 +1,4 @@
 (ns arkham.core
-  (:use [clojure.contrib.macro-utils :only [mexpand-all]])
   (:import [clojure.lang Symbol IDeref ISeq IPersistentVector IPersistentMap
             IPersistentSet Reflector Var]))
 
@@ -26,7 +25,6 @@
        first))
 
 (defmethod meval Symbol [[stack exp]]
-  (println "@meval Symbol" exp)
   [stack
    (if (= exp '*STACK*)
      stack
@@ -40,7 +38,10 @@
 (defmulti eval-seq (fn [[stack [first & _]]] first))
 
 (defmethod meval ISeq [[state exp]]
-  (trampoline eval-seq [state exp]))
+  (let [m (macroexpand-1 exp)]
+    (if (not= m exp)
+      (recur [state m])
+      (trampoline eval-seq [state exp]))))
 
 (defmethod meval IPersistentVector [[stack exp]]
   [stack
@@ -107,8 +108,10 @@
        (dot (second (meval [stack target])) name- args stack))]))
 
 (defmethod eval-seq 'new [[stack [_ class & args]]]
-  (let [class (second (meval [stack (list 'var class)]))]
-    [stack (ctor class stack args)]))
+  (let [class1 (ns-resolve *ns* class)]
+    (if-not (class? class1)
+      (throw (ClassNotFoundException. (str class)))
+      [stack (ctor class1 stack args)])))
 
 (defmethod eval-seq 'throw [[stack [_ exception]]]
   (throw (second (meval [stack exception]))))
@@ -260,7 +263,7 @@
   (second (meval [() (mexpand-all exp)])))
 
 (defn evil* [exp]
-  (meval [() (mexpand-all exp)]))
+  (meval [() exp]))
 
 (defmulti ctor (comp first list))
 
