@@ -33,53 +33,31 @@
     (fn []
       [state (Mock. op)])))
 
-(defmethod eval-seq 'def [[stack [_ name value]]]
-  (swap! *report* update-in [:global] conj name)
-  (meval [stack value])
-  [stack (Mock. nil)])
 
-
-
-(defmethod eval-seq 'fn* [[stack [_ & args]]]
-  (let [fn-name (when (symbol? (first args))
-                  (first args))
-        args (if fn-name
-               (rest args)
-               args)
-        bodies (if (vector? (first args))
-                 (list args)
-                 args)
-        max-args (max-args bodies)
-        max-non-varg (max-non-varg bodies)]
-    (doseq [[args & body] bodies]
-      (meval [(conj stack (zipmap args (repeat (Mock. :local))))
-              (cons 'do body)]))
-    [stack (Mock. :fn)]))
 
 (defmethod meval clojure.lang.Symbol [[stack exp]]
-  [stack
-   (cond
-    (= exp '*STACK*)
-    stack
-    (find-frame stack exp)
-    (get (find-frame stack exp) exp)
-    (some #{exp} (@*report* :global))
-    (Mock. exp)
-    (ns-resolve *ns* exp)
-    (do
-      (swap! *report* update-in [:global] conj exp)
-      (Mock. exp))
-    (and (namespace exp) (name exp))
-    (do
-      (swap! *report* update-in [:stactic-field] conj exp)
-      (Mock. exp))
-    :else
-    (do
-      (when-not (some #{exp} (@*report* :deftype))
-        (swap! *report* update-in [:class] conj exp))
-      (Mock. exp)))])
-
-
+  (let [bound (find-frame stack exp)]
+    [stack
+     (cond
+      (= exp '*STACK*)
+      stack
+      bound
+      (get bound exp)
+      (some #{exp} (@*report* :global))
+      (Mock. exp)
+      (ns-resolve *ns* exp)
+      (do
+        (swap! *report* update-in [:global] conj exp)
+        (Mock. exp))
+      (and (namespace exp) (name exp))
+      (do
+        (swap! *report* update-in [:stactic-field] conj exp)
+        (Mock. exp))
+      :else
+      (do
+        (when-not (some #{exp} (@*report* :deftype))
+          (swap! *report* update-in [:class] conj exp))
+        (Mock. exp)))]))
 
 (def packages #{"java.io" "java.util" "java.util.concurrent" "clojure.lang"})
 
@@ -122,7 +100,7 @@
                     (find-class class loaded)))))))
 
 (defn generate-imports [file]
-  (binding [*report* (atom {:global ['*ns*]})
+  (binding [*report* (atom {})
             eval-if (fn [stack a b c]
                       (meval [stack a])
                       (meval [stack b])
@@ -132,7 +110,17 @@
                          (doall (map (fn [x] (second (meval [stack x]))) args))
                          [stack (Mock. :recur)])
             eval-throw (fn [stack exception]
-                         [stack (Mock. :throw)])]
+                         [stack (Mock. :throw)])
+            eval-fn* (fn [stack fn-name args bodies max-args max-non-varg]
+                       (doseq [[args & body] bodies]
+                         (meval [(conj stack
+                                       (zipmap args (repeat (Mock. :local))))
+                                 (cons 'do body)]))
+                       [stack (Mock. :fn)])
+            eval-def (fn [stack name value]
+                       (swap! *report* update-in [:global] conj name)
+                       (meval [stack value])
+                       [stack (Mock. nil)])]
     (with-open [rdr (java.io.PushbackReader. (reader file))]
       (let [eof (Object.)]
         (doseq [form (take-while #(not= eof %)

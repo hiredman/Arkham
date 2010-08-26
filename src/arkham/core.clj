@@ -43,11 +43,11 @@
 (defmethod meval ISeq [[state exp]]
   (if (seq? exp)
     (if (not (#{'defrecord} (first exp)))
-    (let [m (macroexpand-1 exp)]
-      (if (not= m exp)
-        (recur [state m])
-        (trampoline eval-seq [state exp])))
-    (trampoline eval-seq [state exp]))
+      (let [m (macroexpand-1 exp)]
+        (if (not= m exp)
+          (recur [state m])
+          (trampoline eval-seq [state exp])))
+      (trampoline eval-seq [state exp]))
     (meval [state exp])))
 
 (defmethod meval IPersistentVector [[stack exp]]
@@ -135,18 +135,18 @@
 
 (defn eval-recur [stack args]
   (let [stack1 (loop [[s & ss] stack]
-                   (if (not (and (special-frame? s)
-                                 (= :loop (:tag s))))
-                     (recur ss)
-                     (conj ss s)))
-          {tag :tag [bindings bodies] :args} (first stack1)
-          args (->> args
-                    (map #(meval [stack %]))
-                    (map second)
-                    (map (partial list 'quote)))
-          bindings (vec (mapcat list bindings args))]
-      (meval
-       [(rest stack1) (conj bodies bindings 'loop*)])))
+                 (if (not (and (special-frame? s)
+                               (= :loop (:tag s))))
+                   (recur ss)
+                   (conj ss s)))
+        {tag :tag [bindings bodies] :args} (first stack1)
+        args (->> args
+                  (map #(meval [stack %]))
+                  (map second)
+                  (map (partial list 'quote)))
+        bindings (vec (mapcat list bindings args))]
+    (meval
+     [(rest stack1) (conj bodies bindings 'loop*)])))
 
 (defmethod eval-seq 'recur [[stack [_ & args]]]
   (fn [] (eval-recur stack args)))
@@ -201,6 +201,23 @@
         body (conj body 'do)]
     (second (meval [stack1 body]))))
 
+(defn eval-fn* [stack fn-name args bodies max-args max-non-varg]
+  [stack (fn thisfn [& args]
+           (let [stack (if fn-name (conj stack {fn-name thisfn}) stack)]
+             (cond
+              (and (number? max-args)
+                   (> (count args) max-args))
+              (throw (Exception.
+                      (format "to many arguments to %s (%s)"
+                              (or fn-name thisfn)
+                              max-args)))
+              (>= max-non-varg (count args))
+              (fn-no-varg-eval bodies stack args fn-name)
+              (vector? max-args)
+              (fn-varg-eval bodies stack args fn-name)
+              :else
+              (throw (Exception. "... the hell?")))))])
+
 (defmethod eval-seq 'fn* [[stack [_ & args]]]
   (let [fn-name (when (symbol? (first args))
                   (first args))
@@ -212,21 +229,7 @@
                  args)
         max-args (max-args bodies)
         max-non-varg (max-non-varg bodies)]
-    [stack (fn thisfn [& args]
-             (let [stack (if fn-name (conj stack {fn-name thisfn}) stack)]
-               (cond
-                (and (number? max-args)
-                     (> (count args) max-args))
-                (throw (Exception.
-                        (format "to many arguments to %s (%s)"
-                                (or fn-name thisfn)
-                                max-args)))
-                (>= max-non-varg (count args))
-                (fn-no-varg-eval bodies stack args fn-name)
-                (vector? max-args)
-                (fn-varg-eval bodies stack args fn-name)
-                :else
-                (throw (Exception. "... the hell?")))))]))
+    (eval-fn* stack fn-name args bodies max-args max-non-varg)))
 
 (defmethod eval-seq 'try [[stack [_ & forms]]]
   (let [body (take-while #(or (not (seq? %))
@@ -251,11 +254,14 @@
       (finally
        (meval [stack (conj (rest finally) 'do)])))))
 
-(defmethod eval-seq 'def [[stack [_ name value]]]
+(defn eval-def [stack name value]
   (let [evalue (second (meval [stack value]))]
     (alter-meta!
      (Var/intern *ns* name evalue true)
      (constantly (meta name)))))
+
+(defmethod eval-seq 'def [[stack [_ name value]]]
+  (eval-def stack name value))
 
 (defmethod eval-seq 'letfn* [[stack [_ bindings & body]]]
   (let [stack1 (conj stack (promise))

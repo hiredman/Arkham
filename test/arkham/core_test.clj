@@ -1,6 +1,7 @@
 (ns arkham.core-test
   (:use [arkham.core]
-        [clojure.test])
+        [clojure.test]
+        [clojure.java.io :only [reader]])
   (:require [arkham.bars]))
 
 (deftest test-evil
@@ -113,3 +114,11 @@
                             (finally
                              (.put x :b 2)))
                           [(.get x :a) (.get x :b)]))))))
+
+#_(deftest test-meta-circular
+  (with-open [rdr (java.io.PushbackReader.
+                   (reader "/Users/hiredman/src/Arkham/src/arkham/core.clj"))]
+    (let [eof (Object.)]
+        (doseq [form (take-while #(not= eof %)
+                                 (repeatedly #(read rdr false eof)))]
+          (evil form)))))
