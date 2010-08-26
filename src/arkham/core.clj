@@ -105,7 +105,7 @@
     (second (meval [stack c]))))
 
 (defmethod eval-seq 'if [[stack [_ a b c]]]
-  [stack (eval-if a b c)])
+  [stack (eval-if stack a b c)])
 
 (defmethod eval-seq '. [[stack [_ target name- & args]]]
   (let [n (second (meval [stack target]))]
