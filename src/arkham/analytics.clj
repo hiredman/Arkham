@@ -10,7 +10,7 @@
   (let [class1 (ns-resolve *ns* class)]
     (doall (map (fn [x] (second (meval [stack x]))) args))
     (when-not (some #{class} (@*report* :deftype))
-        (swap! *report* update-in [:class] conj class))
+      (swap! *report* update-in [:class] conj class))
     [stack (Mock. class)]))
 
 (defmethod eval-seq '. [[stack [_ target name- & args]]]
@@ -90,6 +90,32 @@
 (defmethod eval-seq 'throw [[stack _]]
   [stack (Mock. :throw)])
 
+(def packages #{"java.io" "java.util" "java.util.concurrent" "clojure.lang"})
+
+(defn find-class [class loaded]
+  (let [[short full] (->> loaded
+                          (filter #(= class (first %)))
+                          first)
+        [short full] (if (nil? short)
+                       (->> packages
+                            (filter
+                             #(try
+                                (Class/forName
+                                 (str % "."
+                                      (name class)))
+                                (catch Exception _)))
+                            (map
+                             (fn [p]
+                               [class (Class/forName
+                                       (str p "."
+                                            (name class)))]))
+                            first)
+                       [short full])]
+    (when short
+      {(symbol
+        (.replaceAll (.getName full) (str "\\."(name short)) ""))
+       [short]})))
+
 (defn resolve-classes [classes]
   (let [loaded (sort-by
                 (comp (memfn getName) second)
@@ -101,14 +127,8 @@
            (fn [[k value]]
              (vec (cons k (seq value))))
            (apply merge-with concat
-                  (for [class classes
-                        :let [[short full] (->> loaded
-                                                (filter #(= class (first %)))
-                                                first)]
-                        :when (not (nil? short))]
-                    {(symbol
-                      (.replaceAll (.getName full) (str "\\."(name short)) ""))
-                     [short]}))))))
+                  (for [class classes]
+                    (find-class class loaded)))))))
 
 (defn generate-imports [file]
   (binding [*report* (atom {:global ['*ns*]})]
