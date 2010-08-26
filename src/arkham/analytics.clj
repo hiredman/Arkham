@@ -38,9 +38,7 @@
   (meval [stack value])
   [stack (Mock. nil)])
 
-(defmethod eval-seq 'recur [[stack [_ & args]]]
-  (doall (map (fn [x] (second (meval [stack x]))) args))
-  (Mock. :recur))
+
 
 (defmethod eval-seq 'fn* [[stack [_ & args]]]
   (let [fn-name (when (symbol? (first args))
@@ -57,12 +55,6 @@
       (meval [(conj stack (zipmap args (repeat (Mock. :local))))
               (cons 'do body)]))
     [stack (Mock. :fn)]))
-
-(defmethod eval-seq 'if [[stack [_ a b c]]]
-  (second (meval [stack a]))
-  (second (meval [stack b]))
-  (second (meval [stack c]))
-  [stack (Mock. :if)])
 
 (defmethod meval clojure.lang.Symbol [[stack exp]]
   [stack
@@ -87,8 +79,7 @@
         (swap! *report* update-in [:class] conj exp))
       (Mock. exp)))])
 
-(defmethod eval-seq 'throw [[stack _]]
-  [stack (Mock. :throw)])
+
 
 (def packages #{"java.io" "java.util" "java.util.concurrent" "clojure.lang"})
 
@@ -131,7 +122,17 @@
                     (find-class class loaded)))))))
 
 (defn generate-imports [file]
-  (binding [*report* (atom {:global ['*ns*]})]
+  (binding [*report* (atom {:global ['*ns*]})
+            eval-if (fn [stack a b c]
+                      (meval [stack a])
+                      (meval [stack b])
+                      (meval [stack c])
+                      (Mock. :if))
+            eval-recur (fn [stack args]
+                         (doall (map (fn [x] (second (meval [stack x]))) args))
+                         [stack (Mock. :recur)])
+            eval-throw (fn [stack exception]
+                         [stack (Mock. :throw)])]
     (with-open [rdr (java.io.PushbackReader. (reader file))]
       (let [eof (Object.)]
         (doseq [form (take-while #(not= eof %)

@@ -99,11 +99,13 @@
             (or (namespace sym) *ns*)
             (symbol (name sym))))])
 
+(defn eval-if [stack a b c]
+  (if (second (meval [stack a]))
+    (second (meval [stack b]))
+    (second (meval [stack c]))))
+
 (defmethod eval-seq 'if [[stack [_ a b c]]]
-  [stack
-   (if (second (meval [stack a]))
-     (second (meval [stack b]))
-     (second (meval [stack c])))])
+  [stack (eval-if a b c)])
 
 (defmethod eval-seq '. [[stack [_ target name- & args]]]
   (let [n (second (meval [stack target]))]
@@ -118,8 +120,11 @@
       (throw (ClassNotFoundException. (str class)))
       [stack (ctor class1 stack args)])))
 
-(defmethod eval-seq 'throw [[stack [_ exception]]]
+(defn eval-throw [stack exception]
   (throw (second (meval [stack exception]))))
+
+(defmethod eval-seq 'throw [[stack [_ exception]]]
+  (eval-throw stack exception))
 
 (defmethod eval-seq 'loop* [[stack [_ bindings & bodies]]]
   [stack
@@ -128,9 +133,8 @@
      [(conj stack (SpecialFrame. :loop [(take-nth 2 bindings) bodies]))
       (conj bodies bindings 'let*)]))])
 
-(defmethod eval-seq 'recur [[stack [_ & args]]]
-  (fn []
-    (let [stack1 (loop [[s & ss] stack]
+(defn eval-recur [stack args]
+  (let [stack1 (loop [[s & ss] stack]
                    (if (not (and (special-frame? s)
                                  (= :loop (:tag s))))
                      (recur ss)
@@ -142,7 +146,10 @@
                     (map (partial list 'quote)))
           bindings (vec (mapcat list bindings args))]
       (meval
-       [(rest stack1) (conj bodies bindings 'loop*)]))))
+       [(rest stack1) (conj bodies bindings 'loop*)])))
+
+(defmethod eval-seq 'recur [[stack [_ & args]]]
+  (fn [] (eval-recur stack args)))
 
 (defn max-args [bodies]
   (if-let [m (->> bodies
