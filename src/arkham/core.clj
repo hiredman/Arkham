@@ -31,17 +31,24 @@
      (if-let [bound  (find-frame stack exp)]
        (get bound exp)
        (if (ns-resolve *ns* exp)
-         (deref (get-var (ns-resolve *ns* exp) exp))
+         (let [r (get-var (ns-resolve *ns* exp) exp)]
+           (if (class? r)
+             r
+             @r))
          (static-field (ns-resolve *ns* (symbol (namespace exp)))
                        (symbol (name exp))))))])
 
 (defmulti eval-seq (fn [[stack [first & _]]] first))
 
 (defmethod meval ISeq [[state exp]]
-  (let [m (macroexpand-1 exp)]
-    (if (not= m exp)
-      (recur [state m])
-      (trampoline eval-seq [state exp]))))
+  (if (seq? exp)
+    (if (not (#{'defrecord} (first exp)))
+    (let [m (macroexpand-1 exp)]
+      (if (not= m exp)
+        (recur [state m])
+        (trampoline eval-seq [state exp])))
+    (trampoline eval-seq [state exp]))
+    (meval [state exp])))
 
 (defmethod meval IPersistentVector [[stack exp]]
   [stack
@@ -57,10 +64,8 @@
   [stack (set (second (meval [stack (vec exp)])))])
 
 (defmethod eval-seq :default [[state [op & args]]]
-  (let [op (second (meval [state op]))
-        args (doall (map (fn [x] (second (meval [state x]))) args))]
-    (fn []
-      [state (apply op args)])))
+  (fn []
+    (meval [state `(.invoke ~op ~@args)])))
 
 (defmethod eval-seq 'let* [[stack [_ bindings & body]]]
   [stack
@@ -101,7 +106,7 @@
      (second (meval [stack c])))])
 
 (defmethod eval-seq '. [[stack [_ target name- & args]]]
-  (let [n (ns-resolve *ns* target)]
+  (let [n (second (meval [stack target]))]
     [stack
      (if (class? n)
        (dot-static n name- args stack)
@@ -260,7 +265,7 @@
   [stack (.importClass *ns* (Class/forName (second exp)))])
 
 (defn evil [exp]
-  (second (meval [() (mexpand-all exp)])))
+  (second (meval [() exp])))
 
 (defn evil* [exp]
   (meval [() exp]))
